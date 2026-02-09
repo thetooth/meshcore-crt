@@ -1,61 +1,164 @@
 #include <Arduino.h>
 
+#define _TASK_MICRO_RES
+#define _TASK_TIMECRITICAL
+#define _TASK_SLEEP_ON_IDLE_RUN
+
+#include "meshcore/Packet.h"
 #include "pico/stdlib.h"
+#include "ui/console.hpp"
+#include "ui/screensaver.hpp"
+#include "video/video.hpp"
+
+#include <TaskScheduler.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C"
-{
-#include "connections.h"
-#include "cvideo.h"
-#include "renderer.h"
+void draw(void);
+void terminalClient();
+
+#define PADDING          10
+#define SLEEP_TIMEOUT_MS 30000
+
+char MSG_COLDBOOT[] = "AWAITING TELEMETRY";
+
+GFX gfx;
+UI::Console console(gfx);
+bool coldBoot = true;
+bool sleep = false;
+unsigned long sleepTimeout = 0;
+
+Scheduler ts;
+Task t1(10 * 1000, TASK_FOREVER, terminalClient, &ts, true);
+// Task t2(1000, TASK_FOREVER, receiveRadio, &ts, true);
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Booting Meshcore Cyberdeck...");
+
+  // gfx.init(draw);
+
+  renderer_init(draw);
+  Serial.println("Renderer initialised");
+
+  Serial1.setPinout(16, 17);
+  Serial1.setFIFOSize(512);
+  Serial1.begin(115200);
+
+  sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
+
+  while (1) {
+    ts.execute();
+    renderer_run();
+  }
 }
 
-#define SCREEN_WIDTH CVIDEO_PIX_PER_LINE
-#define SCREEN_HEIGHT CVIDEO_LINES
+void loop() {}
 
-// bool pong_gametick_callback(struct repeating_timer *t)
-// {
-//     pong_tick();
-//     return true;
-// }
+arduino::String inputBuffer;
+arduino::String readSerial() {
+  arduino::String result;
+  while (Serial.available()) {
+    sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
+    if (sleep) {
+      sleep = false;
 
-uint64_t current_time = 0;
-static char text_buffer[128];
-
-int xOffset = 0;
-int yOffset = 0;
-void draw(void)
-{
-    xOffset = sin(current_time / 10.0) * 80.0;
-    yOffset = cos(current_time / 10.0) * 60.0;
-
-    sprintf(text_buffer, "Lil pico boi");
-    renderer_draw_string(SCREEN_WIDTH / 2 + xOffset, SCREEN_HEIGHT / 2 + yOffset, 2, text_buffer, strlen(text_buffer),
-                         JUSTIFY_CENTRE);
-    current_time++;
-    sprintf(text_buffer, "%llu", current_time);
-    renderer_draw_string(SCREEN_WIDTH / 2 - xOffset, SCREEN_HEIGHT / 2 + 30 - yOffset, 1, text_buffer,
-                         strlen(text_buffer), JUSTIFY_CENTRE);
-}
-
-void setup()
-{
-    Serial.begin(115200);
-    Serial.println("Pi Pico Pong\r\n");
-    Serial.println("Created by Alan Reed\r\n");
-
-    renderer_init(draw);
-
-    // struct repeating_timer timer;
-    // add_repeating_timer_ms(PONG_FRAME_INTERVAL_ms, pong_gametick_callback, NULL, &timer);
-
-    while (1)
-    {
-        renderer_run();
+      // Discard first input
+      Serial.read();
+      continue;
     }
+
+    result += (char)Serial.read();
+  }
+  return result;
 }
 
-void loop()
-{
+void terminalClient() {
+  inputBuffer += readSerial();
+  // Backspace handling
+  if ((inputBuffer.endsWith("\b") || inputBuffer.endsWith("\x7F")) && inputBuffer.length() > 1) {
+    inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 2);
+  }
+  // Command handling
+  if (inputBuffer.endsWith("\r") || inputBuffer.endsWith("\n")) {
+    auto command = inputBuffer.substring(0, inputBuffer.length() - 1);
+    inputBuffer = "";
+
+    console.print("> ");
+
+    if (command == "/clr") {
+      console.lines.fill("");
+      return;
+    }
+    if (command == "/sleep") {
+      gfx.clear();
+      sleep = true;
+      return;
+    }
+
+    Serial1.print(command + "\r\n");
+  }
+
+  if (Serial1.available()) {
+    coldBoot = false;
+    sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
+    if (sleep) {
+      sleep = false;
+    }
+
+    auto c = (char)Serial1.read();
+    Serial.print(c);
+    if (c == '\n') {
+      console.ln();
+      return;
+    }
+    if (c == '\r') {
+      return;
+    }
+    console.append(c);
+  }
+}
+
+arduino::String prompt;
+uint32_t frameCount = 0;
+void draw(void) {
+  frameCount++;
+  if (millis() > sleepTimeout) {
+    sleep = true;
+  }
+  if (sleep) {
+    UI::screensaver(gfx);
+    return;
+  }
+
+  if (!coldBoot && false) {
+    // Draw 20x20 grid
+    for (int x = 32; x < gfx.width - PADDING; x += 32) {
+      for (int y = 32; y < gfx.height - PADDING; y += 32) {
+        gfx.drawRect(x, y, 2, 2);
+      }
+    }
+
+    // Render area box
+    gfx.drawRect(0, 0, gfx.width, 1);
+    gfx.drawRect(0, gfx.height, gfx.width, 1);
+
+    gfx.drawRect(0, 0, 2, gfx.height);
+    gfx.drawRect(gfx.width, 0, 2, gfx.height);
+  }
+
+  if (coldBoot && frameCount % 4 == 0) {
+    gfx.drawText(gfx.width / 2, gfx.height / 2, 3, MSG_COLDBOOT, sizeof(MSG_COLDBOOT) - 1, JUSTIFY_CENTRE);
+  }
+
+  console.draw();
+
+  prompt = "> " + inputBuffer;
+
+  gfx.drawText(16, gfx.height - 48, 2, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
+
+  // Flashing cursor
+  if ((millis() / 100) % 2 == 0) {
+    gfx.drawRect(16 + prompt.length() * 20, gfx.height - 48, 12, 24);
+  }
 }

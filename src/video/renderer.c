@@ -166,7 +166,7 @@ void renderer_draw_image(unsigned int x, unsigned int y, unsigned int width, uns
     }
 }
 
-void renderer_draw_character(unsigned int x, unsigned int y, unsigned int scale, char character)
+void renderer_draw_character(unsigned int x, unsigned int y, unsigned int scale, char character, bool invert)
 {
     if (drawing_in_progress)
     {
@@ -199,7 +199,8 @@ void renderer_draw_character(unsigned int x, unsigned int y, unsigned int scale,
                 {
                     for (int sy = 0; sy < scale; sy++)
                     {
-                        set_bit(x + ((i - font_x) * scale) + sx, y + ((j - font_y) * scale) + sy, !value);
+                        set_bit(x + ((i - font_x) * scale) + sx, y + ((j - font_y) * scale) + sy,
+                                invert ? value : !value);
                     }
                 }
             }
@@ -208,7 +209,7 @@ void renderer_draw_character(unsigned int x, unsigned int y, unsigned int scale,
 }
 
 void renderer_draw_string(unsigned int x, unsigned int y, unsigned int scale, char *text, unsigned int length,
-                          renderer_text_justify_t justification)
+                          renderer_text_justify_t justification, bool invert)
 {
     if (drawing_in_progress)
     {
@@ -217,7 +218,7 @@ void renderer_draw_string(unsigned int x, unsigned int y, unsigned int scale, ch
         case JUSTIFY_LEFT:
             for (int i = 0; i < length; i++)
             {
-                renderer_draw_character(x + (i * CHAR_WIDTH * scale), y, scale, text[i]);
+                renderer_draw_character(x + (i * CHAR_WIDTH * scale), y, scale, text[i], invert);
             }
             break;
 
@@ -225,14 +226,14 @@ void renderer_draw_string(unsigned int x, unsigned int y, unsigned int scale, ch
             for (int i = 0; i < length; i++)
             {
                 renderer_draw_character(x - (length * scale * CHAR_WIDTH / 2) + (i * CHAR_WIDTH * scale), y, scale,
-                                        text[i]);
+                                        text[i], invert);
             }
             break;
 
         case JUSTIFY_RIGHT:
             for (int i = 0; i < length; i++)
             {
-                renderer_draw_character(x - ((length - i) * CHAR_WIDTH * scale), y, scale, text[i]);
+                renderer_draw_character(x - ((length - i) * CHAR_WIDTH * scale), y, scale, text[i], invert);
             }
             break;
 
@@ -256,6 +257,11 @@ static void update_output_buffer(void)
         drawing_overrun = true;
     }
     redraw_frame_requested = true;
+}
+
+void renderer_clear_default(void)
+{
+    renderer_clear(drawing_buffer);
 }
 
 static void renderer_clear(buffer_t *buffer)
