@@ -48,19 +48,19 @@ public:
 
         if (frameIndex >= frameLength) {
           if (frameDir == '>') {
-            Serial.println("UART OUT");
+            // Serial.println("UART OUT");
           } else if (frameDir == '<') {
-            Serial.println("UART IN");
+            // Serial.println("UART IN");
           }
 
-          Serial.println(" LEN " + String(frameLength));
+          // Serial.println(" LEN " + String(frameLength));
 
-          Serial.print("FRAME: ");
-          for (int i = 0; i < frameLength; i++) {
-            Serial.print(frameBuffer[i], HEX);
-            Serial.print(" ");
-          }
-          Serial.println();
+          // Serial.print("FRAME: ");
+          // for (int i = 0; i < frameLength; i++) {
+          // Serial.print(frameBuffer[i], HEX);
+          // Serial.print(" ");
+          // }
+          // Serial.println();
 
           client.handlePacket(frameBuffer, frameLength);
 

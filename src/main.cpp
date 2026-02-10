@@ -43,6 +43,14 @@ Task t3(
       }
     },
     &ts, true);
+Task channelInfoTask(
+    1000, TASK_FOREVER,
+    []() {
+      if (client.requestAllChannels()) {
+        channelInfoTask.disable();
+      }
+    },
+    &ts, false);
 
 void setup() {
   Serial.begin(115200);
@@ -61,6 +69,10 @@ void setup() {
   sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
 
   client.appStart();
+  channelInfoTask.delay(2000 * 1000);
+  channelInfoTask.enable();
+  client.requestContacts();
+
   while (1) {
     serialInterface.receiveRadio();
 

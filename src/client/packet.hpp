@@ -13,6 +13,13 @@ namespace MeshCore {
 // Bytes 2-10: "mccli" (ASCII, null-padded to 9 bytes)
 char CMD_APP_START[] = { 0x01, 0x03, 'm', 'c', 'c', 'l', 'i', 0, 0, 0 };
 
+// Byte 0: 0x1F
+// Byte 1: Channel Index (0-7)
+char CMD_CHANNEL_INFO[] = { 0x1F, 0x00 };
+
+// Byte 0: 0x04
+char CMD_GET_CONTACTS[] = { 0x04 };
+
 // Byte 0: 0x0D
 // Byte 1: Firmware Version (uint8)
 // Bytes 2+: Variable length based on firmware version
