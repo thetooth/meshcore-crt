@@ -4,7 +4,8 @@
 #define _TASK_TIMECRITICAL
 #define _TASK_SLEEP_ON_IDLE_RUN
 
-#include "meshcore/Packet.h"
+#include "client/api.hpp"
+#include "client/serial.hpp"
 #include "pico/stdlib.h"
 #include "ui/console.hpp"
 #include "ui/screensaver.hpp"
@@ -24,16 +25,28 @@ char MSG_COLDBOOT[] = "AWAITING TELEMETRY";
 
 GFX gfx;
 UI::Console console(gfx);
-bool coldBoot = true;
+MeshCore::Client client(console);
+MeshCore::SerialInterface serialInterface(client);
+
+bool coldBoot = false;
 bool sleep = false;
 unsigned long sleepTimeout = 0;
 
 Scheduler ts;
-Task t1(10 * 1000, TASK_FOREVER, terminalClient, &ts, true);
-// Task t2(1000, TASK_FOREVER, receiveRadio, &ts, true);
+// Task t1(10 * 1000, TASK_FOREVER, terminalClient, &ts, true);
+// Task t2(1000, TASK_FOREVER, []() { client.receiveRadio(); }, &ts, true);
+Task t3(
+    1000 * 1000, TASK_FOREVER,
+    []() {
+      if (client.msgWaiting) {
+        client.requestNextMessage();
+      }
+    },
+    &ts, true);
 
 void setup() {
   Serial.begin(115200);
+  sleep_ms(1000);
   Serial.println("Booting Meshcore Cyberdeck...");
 
   // gfx.init(draw);
@@ -47,7 +60,10 @@ void setup() {
 
   sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
 
+  client.appStart();
   while (1) {
+    serialInterface.receiveRadio();
+
     ts.execute();
     renderer_run();
   }
@@ -124,7 +140,7 @@ uint32_t frameCount = 0;
 void draw(void) {
   frameCount++;
   if (millis() > sleepTimeout) {
-    sleep = true;
+    // sleep = true;
   }
   if (sleep) {
     UI::screensaver(gfx);
