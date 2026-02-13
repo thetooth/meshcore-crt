@@ -8,6 +8,7 @@
 #include "client/serial.hpp"
 #include "pico/stdlib.h"
 #include "ui/console.hpp"
+#include "ui/prompt.hpp"
 #include "ui/screensaver.hpp"
 #include "video/video.hpp"
 
@@ -16,23 +17,24 @@
 #include <stdlib.h>
 
 void draw(void);
-void terminalClient();
 
 #define PADDING             10
 #define SLEEP_TIMEOUT_MS    30000
 #define ACTIVITY_TIMEOUT_MS 1000
 
 char MSG_COLDBOOT[] = "AWAITING TELEMETRY";
-
-GFX gfx;
-UI::Console console(gfx);
-MeshCore::Client client(console);
-MeshCore::SerialInterface serialInterface(client);
-
 bool coldBoot = false;
 bool sleep = false;
 unsigned long sleepTimeout = 0;
 unsigned long activityTimeout = 0;
+
+GFX gfx;
+UI::Console console;
+
+MeshCore::Client client(console);
+MeshCore::SerialInterface serialInterface(client);
+
+UI::Prompt prompt(client, console, sleep);
 
 Scheduler ts;
 // Task t1(10 * 1000, TASK_FOREVER, terminalClient, &ts, true);
@@ -78,15 +80,19 @@ void setup() {
   while (1) {
     // serialInterface.receiveRadio();
     if (client.activity) {
-      sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
       activityTimeout = millis() + ACTIVITY_TIMEOUT_MS;
-      if (sleep) {
-        sleep = false;
-      }
       client.activity = false;
     }
 
-    terminalClient();
+    if (client.activity || prompt.activity) {
+      sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
+      if (sleep) {
+        sleep = false;
+      }
+      prompt.activity = false;
+    }
+
+    prompt.terminalClient();
 
     ts.execute();
     renderer_run();
@@ -95,97 +101,11 @@ void setup() {
 
 void loop() {}
 
-arduino::String inputBuffer;
-arduino::String readSerial() {
-  arduino::String result;
-  while (Serial.available()) {
-    sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
-    if (sleep) {
-      sleep = false;
-
-      // Discard first input
-      Serial.read();
-      continue;
-    }
-
-    result += (char)Serial.read();
-  }
-  return result;
-}
-
-void terminalClient() {
-  inputBuffer += readSerial();
-  // Backspace handling
-  if ((inputBuffer.endsWith("\b") || inputBuffer.endsWith("\x7F")) && inputBuffer.length() >= 1) {
-    if (inputBuffer.length() >= 2) {
-      inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 2);
-    } else {
-      inputBuffer = "";
-    }
-  }
-  // Tab handling
-  if (inputBuffer.endsWith("\t")) {
-    if (inputBuffer.startsWith("/to ")) {
-      auto partialName = inputBuffer.substring(4, inputBuffer.length() - 1);
-      for (const auto &[_, contact] : client.contacts) {
-        if (contact.advName.startsWith(partialName)) {
-          inputBuffer = "/to " + contact.advName + " ";
-          break;
-        }
-      }
-    } else {
-      inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 1);
-    }
-  }
-  // Command handling
-  if (inputBuffer.endsWith("\r") || inputBuffer.endsWith("\n")) {
-    auto command = inputBuffer.substring(0, inputBuffer.length() - 1);
-    inputBuffer = "";
-
-    if (command == "/help") {
-      console.print("Available commands:");
-      console.print("/clear - Clear the console");
-      console.print("/sleep - Enter sleep mode with screensaver");
-      console.print("/self - Show self information");
-      console.print("/list chan,contact - Request channel or contact list");
-      return;
-    }
-    if (command == "/clear") {
-      console.lines.fill("");
-      return;
-    }
-    if (command == "/sleep") {
-      gfx.clear();
-      sleep = true;
-      return;
-    }
-    if (command.startsWith("/self")) {
-      console.print(client.self.deviceName);
-      console.print("Freq " + String(client.self.radioFreq) + " MHz");
-      console.print("BW   " + String(client.self.radioBandwidth) + " kHz");
-      console.print("SF   " + String(client.self.radioSpreadingFactor));
-      console.print("CR   " + String(client.self.radioCodingRate));
-    }
-    if (command.startsWith("/list")) {
-      if (command.endsWith("chan")) {
-        for (int i = 0; i < client.channels.size(); i++) {
-          auto &ch = client.channels.at(i);
-          console.print("CH " + String(i) + ": " + ch.name);
-        }
-      } else if (command.endsWith("contact")) {
-        for (const auto &[_, contact] : client.contacts) {
-          console.print("CON: " + contact.advName);
-        }
-      }
-    }
-  }
-}
-
-arduino::String prompt;
 uint32_t frameCount = 0;
 void draw(void) {
   auto t0 = millis();
   frameCount++;
+
   if (millis() > sleepTimeout) {
     sleep = true;
   }
@@ -215,16 +135,10 @@ void draw(void) {
     gfx.drawText(gfx.width / 2, gfx.height / 2, 3, MSG_COLDBOOT, sizeof(MSG_COLDBOOT) - 1, JUSTIFY_CENTRE);
   }
 
-  console.draw();
+  console.draw(gfx);
 
-  prompt = "> " + inputBuffer;
+  prompt.draw(gfx);
 
-  gfx.drawText(16, gfx.height - 24, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
-
-  // Flashing cursor
-  if ((millis() / 100) % 2 == 0) {
-    gfx.drawRect(16 + prompt.length() * 10, gfx.height - 24, 6, 12);
-  }
   auto t1 = millis() - t0;
   auto fps = arduino::String(t1) + "ms";
   gfx.drawText(gfx.width - 16, gfx.height - 48, 1, const_cast<char *>(fps.c_str()), fps.length(),

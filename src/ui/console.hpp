@@ -8,9 +8,9 @@
 namespace UI {
 class Console {
 public:
-  Console(GFX &gfx) : gfx(gfx) {}
+  Console() {}
 
-  void draw() {
+  void draw(GFX &gfx) {
     for (int i = 0; i < lines.size(); i++) {
       gfx.drawText(16, 16 + (i * 16), 1, const_cast<char *>(lines[i].c_str()), lines[i].length(),
                    JUSTIFY_LEFT);
@@ -38,7 +38,9 @@ public:
     lines[lines.size() - 1] = "";
   }
 
-  GFX &gfx;
+  void clear() { lines.fill(""); }
+
+private:
   static const int maxLines = 12;
   static const int maxCharsPerLine = 30;
   std::array<arduino::String, maxLines> lines;
