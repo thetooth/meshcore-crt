@@ -7,11 +7,10 @@
 extern uint32_t renderer_screen_width;
 extern uint32_t renderer_screen_height;
 
-typedef enum
-{
-    JUSTIFY_LEFT,
-    JUSTIFY_RIGHT,
-    JUSTIFY_CENTRE,
+typedef enum {
+  JUSTIFY_LEFT,
+  JUSTIFY_RIGHT,
+  JUSTIFY_CENTRE,
 } renderer_text_justify_t;
 
 typedef void (*renderer_draw_callback_t)(void);
@@ -30,5 +29,10 @@ void renderer_draw_character(unsigned int x, unsigned int y, unsigned int scale,
 
 void renderer_draw_string(unsigned int x, unsigned int y, unsigned int scale, char *text, unsigned int length,
                           renderer_text_justify_t justification, bool invert);
+
+void renderer_draw_wchar(unsigned int x, unsigned int y, unsigned int scale, uint32_t character, bool invert);
+
+void renderer_draw_wstring(unsigned int x, unsigned int y, unsigned int scale, uint32_t *text,
+                           unsigned int length, renderer_text_justify_t justification, bool invert);
 
 #endif

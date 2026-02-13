@@ -32,6 +32,27 @@ class Client {
 public:
   Client(UI::Console &console) : console(console) {}
 
+  uint32_t readU32LE(const uint8_t *buf) {
+    return static_cast<uint32_t>(buf[0]) | (static_cast<uint32_t>(buf[1]) << 8) |
+           (static_cast<uint32_t>(buf[2]) << 16) | (static_cast<uint32_t>(buf[3]) << 24);
+  };
+  int32_t readS32LE(const uint8_t *buf) {
+    return static_cast<int32_t>(buf[0]) | (static_cast<int32_t>(buf[1]) << 8) |
+           (static_cast<int32_t>(buf[2]) << 16) | (static_cast<int32_t>(buf[3]) << 24);
+  };
+  void writeU32LE(uint8_t *buf, uint32_t value) {
+    buf[0] = value & 0xFF;
+    buf[1] = (value >> 8) & 0xFF;
+    buf[2] = (value >> 16) & 0xFF;
+    buf[3] = (value >> 24) & 0xFF;
+  };
+  void writeS32LE(uint8_t *buf, int32_t value) {
+    buf[0] = value & 0xFF;
+    buf[1] = (value >> 8) & 0xFF;
+    buf[2] = (value >> 16) & 0xFF;
+    buf[3] = (value >> 24) & 0xFF;
+  };
+
   // An inbound frame starts with byte 60 (ASCII '<'), then 2 bytes with frame length, followed by actual
   // frame.
   void send(const char *data, uint16_t len) {
@@ -62,7 +83,11 @@ public:
     return channels.requestAll([this](uint8_t channelIndex) { requestChannelInfo(channelIndex); });
   }
 
-  void requestContacts() { send(CMD_GET_CONTACTS, sizeof(CMD_GET_CONTACTS)); }
+  void requestContacts() {
+    auto cmd = CMD_GET_CONTACTS;
+    writeU32LE((uint8_t *)cmd + 1, contacts.since);
+    send(cmd, sizeof(cmd));
+  }
 
   void requestNextMessage() {
     char REQ_NEXT[] = { 0x0A };
@@ -73,31 +98,26 @@ public:
     auto pubKeyPrefix = arduino::String((char *)msg.pubKeyPrefix, 6);
 
     arduino::String name = "UNKNOWN";
-    if (auto it = contacts.find(pubKeyPrefix); it != contacts.end()) {
-      name = it->second.advName;
+    if (contacts.contains(pubKeyPrefix)) {
+      name = contacts.at(pubKeyPrefix).advName;
     }
 
-    console.print("CONTACT_MSG from " + name + ": ");
+    console.print("DIRECT " + name + ": ");
     console.print(String(msg.msg));
+    activity = true;
   }
 
   void handleChannelMsg(const CHANNEL_MSG &msg) {
     auto &ch = channels.at(msg.channelIndex);
-    console.print("CHANNEL_MSG to " + String(ch.name) + ": ");
+    console.print("CHANNEL " + String(ch.name) + ": ");
     console.print(String(msg.msg));
+    activity = true;
   }
 
   void handlePacket(uint8_t *data, uint16_t len) {
     uint8_t offset = 0;
     uint8_t type = data[offset++];
-    auto readU32LE = [](const uint8_t *buf) -> uint32_t {
-      return static_cast<uint32_t>(buf[0]) | (static_cast<uint32_t>(buf[1]) << 8) |
-             (static_cast<uint32_t>(buf[2]) << 16) | (static_cast<uint32_t>(buf[3]) << 24);
-    };
-    auto read32LE = [](const uint8_t *buf) -> int32_t {
-      return static_cast<int32_t>(buf[0]) | (static_cast<int32_t>(buf[1]) << 8) |
-             (static_cast<int32_t>(buf[2]) << 16) | (static_cast<int32_t>(buf[3]) << 24);
-    };
+
     // Serial.print("Packet type: ");
     // Serial.println(type, HEX);
 
@@ -122,9 +142,9 @@ public:
       offset += 32;
       contact.lastAdvert = readU32LE(data + offset);
       offset += 4;
-      contact.advLat = read32LE(data + offset);
+      contact.advLat = readS32LE(data + offset);
       offset += 4;
-      contact.advLon = read32LE(data + offset);
+      contact.advLon = readS32LE(data + offset);
       offset += 4;
       contact.lastMod = readU32LE(data + offset);
       offset += 4;
@@ -154,6 +174,7 @@ public:
       }
 
       console.print("Contacts: " + String(contacts.count));
+      activity = true;
 
       break;
     case PACKET_MESSAGES_WAITING:
@@ -219,11 +240,15 @@ public:
       payload.msg = arduino::String(data + offset, len - offset);
 
       handleChannelMsg(payload);
-      break;
-    }
+    } break;
+    case PACKET_ADVERTISEMENT: {
+      Serial.println("Received advertisement packet");
+      requestContacts();
+    } break;
     }
   }
 
+  bool activity = false;
   bool msgWaiting = true;
 
   ChannelList channels;

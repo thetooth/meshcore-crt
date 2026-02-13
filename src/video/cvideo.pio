@@ -14,15 +14,10 @@
 .program cvsync
 .side_set 1
 
-; Number of video lines per field stored in OSR
-; Y register used as odd/even flag: FFFFFFFF = odd, 0 = even
+; Number of video lines per frame stored in OSR
 .wrap_target
 vsync_start:
-    ; First set of short pulses: 6 for even, 5 for odd
-    jmp !y set_even_counter side 0
-    set x, 3 side 1 ; odd pulses, 3 + 1 + 1
-    jmp vsync_short_pulse side 1 [13]
-set_even_counter:
+    ; First set of short pulses: always 6
     set x, 4 side 1 [14] ; even_pulses, 4 + 1 + 1
 
 vsync_short_pulse:
@@ -36,15 +31,10 @@ vsync_long_start:
     jmp x-- vsync_long_start [13] side 0;
 vsync_long_end:
 
-    ; Second set of short pulses: 5 for even, 4 for odd
-    jmp !y set_even_counter_2 side 0
-    set x, 2 side 1 ; odd pulses, 2 + 1 + 1
-    jmp flip_field_flag side 1 [12] ; Delays are 1 cycle less due to flip instruction
-set_even_counter_2:
+    ; Second set of short pulses: always 5
     set x, 3 side 1 [13] ; even_pulses, 3 + 1 + 1
-    
-flip_field_flag:
-    mov y ! y side 1 ; flip y between fields
+
+    nop side 1
 
 vsync_short_pulse_2:
     nop side 0
@@ -58,7 +48,7 @@ hsync_blank_start:
     jmp x-- hsync_blank_start side 0 [1] ; 4us hsync pulse
 hsync_blank_end:
 
-    ; 288 lines of video data
+    ; Video data lines
     mov x osr side 0 [1]
 hsync_video:
     nop side 1 [2] ; 6us back porch

@@ -12,7 +12,7 @@ public:
 
   void draw() {
     for (int i = 0; i < lines.size(); i++) {
-      gfx.drawText(16, 16 + (i * 32), 2, const_cast<char *>(lines[i].c_str()), lines[i].length(),
+      gfx.drawText(16, 16 + (i * 16), 1, const_cast<char *>(lines[i].c_str()), lines[i].length(),
                    JUSTIFY_LEFT);
     }
   }

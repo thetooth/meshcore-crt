@@ -18,7 +18,8 @@ char CMD_APP_START[] = { 0x01, 0x03, 'm', 'c', 'c', 'l', 'i', 0, 0, 0 };
 char CMD_CHANNEL_INFO[] = { 0x1F, 0x00 };
 
 // Byte 0: 0x04
-char CMD_GET_CONTACTS[] = { 0x04 };
+// Byte 1-4: Optional value (32-bit little-endian integer)
+char CMD_GET_CONTACTS[] = { 0x04, 0x00, 0x00, 0x00, 0x00 };
 
 // Byte 0: 0x0D
 // Byte 1: Firmware Version (uint8)

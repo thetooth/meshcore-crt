@@ -1,7 +1,6 @@
 #pragma once
 
-extern "C"
-{
+extern "C" {
 #include "connections.h"
 #include "cvideo.h"
 #include "renderer.h"
@@ -9,29 +8,25 @@ extern "C"
 
 #include <functional>
 
-class GFX
-{
-  public:
-    GFX()
-    {
-    }
+class GFX {
+public:
+  GFX() {}
 
-    void init(std::function<void(GFX &)> draw_callback)
-    {
-        // renderer_init([&]() { draw_callback(*this); });
-    }
+  void init(std::function<void(GFX &)> draw_callback) {
+    // renderer_init([&]() { draw_callback(*this); });
+  }
 
-    void drawRect(unsigned int x, unsigned int y, unsigned int width, unsigned int height);
-    void drawText(unsigned int x, unsigned int y, unsigned int scale, char *text, unsigned int length,
-                  renderer_text_justify_t justification, bool invert = false);
-    void drawImage(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char *data);
-    void drawCharacter(unsigned int x, unsigned int y, unsigned int scale, char character, bool invert = false);
-    void clear();
+  void drawRect(unsigned int x, unsigned int y, unsigned int width, unsigned int height);
+  void drawText(unsigned int x, unsigned int y, unsigned int scale, char *text, unsigned int length,
+                renderer_text_justify_t justification, bool invert = false);
+  void drawImage(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char *data);
+  void drawCharacter(unsigned int x, unsigned int y, unsigned int scale, char character, bool invert = false);
+  void clear();
 
-    int width = 640;
-    int height = 480;
-    int screenXOffset = 0;
-    int screenYOffset = 0;
-    int screenLeft = (CVIDEO_PIX_PER_LINE - width) / 2 - screenXOffset;
-    int screenRight = (CVIDEO_LINES - height) / 2 - screenYOffset;
+  int width = 640 / 2;
+  int height = 480 / 2;
+  int screenXOffset = 0;
+  int screenYOffset = 0;
+  int screenLeft = (CVIDEO_PIX_PER_LINE - width) / 2 - screenXOffset;
+  int screenRight = (CVIDEO_LINES - height) / 2 - screenYOffset;
 };

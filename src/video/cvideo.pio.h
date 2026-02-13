@@ -15,43 +15,37 @@
 // ------ //
 
 #define cvsync_wrap_target 0
-#define cvsync_wrap 24
+#define cvsync_wrap 18
 #define cvsync_pio_version 0
 
 static const uint16_t cvsync_program_instructions[] = {
             //     .wrap_target
-    0x0063, //  0: jmp    !y, 3           side 0
-    0xf023, //  1: set    x, 3            side 1
-    0x1d04, //  2: jmp    4               side 1 [13]
-    0xfe24, //  3: set    x, 4            side 1 [14]
-    0xa042, //  4: nop                    side 0
-    0x1e44, //  5: jmp    x--, 4          side 1 [14]
-    0xed24, //  6: set    x, 4            side 0 [13]
-    0x1129, //  7: jmp    !x, 9           side 1 [1]
-    0x0d47, //  8: jmp    x--, 7          side 0 [13]
-    0x006c, //  9: jmp    !y, 12          side 0
-    0xf022, // 10: set    x, 2            side 1
-    0x1c0d, // 11: jmp    13              side 1 [12]
-    0xfd23, // 12: set    x, 3            side 1 [13]
-    0xb04a, // 13: mov    y, ~y           side 1
-    0xa042, // 14: nop                    side 0
-    0x1e4e, // 15: jmp    x--, 14         side 1 [14]
-    0xe130, // 16: set    x, 16           side 0 [1]
-    0xbe42, // 17: nop                    side 1 [14]
-    0x1e34, // 18: jmp    !x, 20          side 1 [14]
-    0x0151, // 19: jmp    x--, 17         side 0 [1]
-    0xa127, // 20: mov    x, osr          side 0 [1]
-    0xb242, // 21: nop                    side 1 [2]
-    0xdd00, // 22: irq    nowait 0        side 1 [13]
-    0x1c20, // 23: jmp    !x, 0           side 1 [12]
-    0x0155, // 24: jmp    x--, 21         side 0 [1]
+    0xfe24, //  0: set    x, 4            side 1 [14]
+    0xa042, //  1: nop                    side 0
+    0x1e41, //  2: jmp    x--, 1          side 1 [14]
+    0xed24, //  3: set    x, 4            side 0 [13]
+    0x1126, //  4: jmp    !x, 6           side 1 [1]
+    0x0d44, //  5: jmp    x--, 4          side 0 [13]
+    0xfd23, //  6: set    x, 3            side 1 [13]
+    0xb042, //  7: nop                    side 1
+    0xa042, //  8: nop                    side 0
+    0x1e48, //  9: jmp    x--, 8          side 1 [14]
+    0xe130, // 10: set    x, 16           side 0 [1]
+    0xbe42, // 11: nop                    side 1 [14]
+    0x1e2e, // 12: jmp    !x, 14          side 1 [14]
+    0x014b, // 13: jmp    x--, 11         side 0 [1]
+    0xa127, // 14: mov    x, osr          side 0 [1]
+    0xb242, // 15: nop                    side 1 [2]
+    0xdd00, // 16: irq    nowait 0        side 1 [13]
+    0x1c20, // 17: jmp    !x, 0           side 1 [12]
+    0x014f, // 18: jmp    x--, 15         side 0 [1]
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program cvsync_program = {
     .instructions = cvsync_program_instructions,
-    .length = 25,
+    .length = 19,
     .origin = -1,
     .pio_version = cvsync_pio_version,
 #if PICO_PIO_VERSION > 0

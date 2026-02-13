@@ -30,6 +30,8 @@ public:
 };
 class ContactList : public std::map<arduino::String, Contact> {
 public:
+  bool contains(const arduino::String &pubKeyPrefix) const { return find(pubKeyPrefix) != end(); }
+
   uint32_t count = 0;
   uint32_t since = 0;
 };
