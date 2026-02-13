@@ -3,10 +3,19 @@
 
 #include "hardware/pio.h"
 
-#define CVIDEO_LINES        576 / 2
+#ifndef CVIDEO_INTERLACED
+#define CVIDEO_INTERLACED 0
+#endif
+
 // Pixels per line should be a multiple of 32
 // For very high or very low pixel counts, DATA_DELAY within cvideo.pio may need adjustment
-#define CVIDEO_PIX_PER_LINE 768 / 2
+#if CVIDEO_INTERLACED
+#define CVIDEO_LINES        576
+#define CVIDEO_PIX_PER_LINE 768
+#else
+#define CVIDEO_LINES        288
+#define CVIDEO_PIX_PER_LINE 384
+#endif
 
 typedef uint32_t (*cvideo_data_callback_t)(void);
 

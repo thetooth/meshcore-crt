@@ -23,8 +23,8 @@ public:
   void drawCharacter(unsigned int x, unsigned int y, unsigned int scale, char character, bool invert = false);
   void clear();
 
-  int width = 640 / 2;
-  int height = 480 / 2;
+  int width = CVIDEO_INTERLACED ? 640 : 320;
+  int height = CVIDEO_INTERLACED ? 480 : 240;
   int screenXOffset = 0;
   int screenYOffset = 0;
   int screenLeft = (CVIDEO_PIX_PER_LINE - width) / 2 - screenXOffset;

@@ -46,12 +46,24 @@ uint32_t data_callback(void) {
 
   if (current_pix == LINE_WORD_COUNT) {
     current_pix = 0;
+#if CVIDEO_INTERLACED
+    current_line = current_line + 2;
+
+    if (current_line == CVIDEO_LINES + 1) {
+      current_line = 0;
+      update_output_buffer();
+    } else if (current_line == CVIDEO_LINES) {
+      current_line = 1;
+      update_output_buffer();
+    }
+#else
     current_line = current_line + 1;
 
     if (current_line == CVIDEO_LINES) {
       current_line = 0;
       update_output_buffer();
     }
+#endif
   }
   if (pio_sm_is_tx_fifo_empty(pio0, 0)) {
     data_underrun = true;
@@ -68,7 +80,12 @@ void renderer_init(renderer_draw_callback_t callback) {
   drawing_overrun = false;
   drawing_callback = callback;
 
+#if CVIDEO_INTERLACED
+  // PIO starts with odd lines
+  current_line = 1;
+#else
   current_line = 0;
+#endif
   current_pix = 0;
 
   cvideo_init(pio0, CVIDEO_DATA_PIN, CVIDEO_SYNC_PIN, data_callback);

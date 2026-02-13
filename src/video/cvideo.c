@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 
-
 // Sync PIO needs 2us per instruction
 #define SYNC_INTERVAL 0.000002
 // Data transmits for 52us
@@ -49,8 +48,14 @@ void cvideo_init(PIO pio, uint data_pin, uint sync_pin, cvideo_data_callback_t c
     printf("Data clockdiv %f\r\n", data_clockdiv);
     printf("Sync clockdiv %f\r\n", sync_clockdiv);
 
-    uint offset_sync = pio_add_program(pio, &cvsync_program);
+    uint offset_sync;
     uint offset_data = pio_add_program(pio, &cvdata_program);
+
+#if CVIDEO_INTERLACED
+    offset_sync = pio_add_program(pio, &cvsync_interlaced_program);
+#else
+    offset_sync = pio_add_program(pio, &cvsync_progressive_program);
+#endif
 
     cvdata_program_init(pio, DATA_SM_ID, offset_data, data_clockdiv, data_pin);
     cvsync_program_init(pio, SYNC_SM_ID, offset_sync, sync_clockdiv, sync_pin);
@@ -97,7 +102,12 @@ static inline void cvdata_program_init(PIO pio, uint sm, uint offset, float cloc
 }
 
 static inline void cvsync_program_init(PIO pio, uint sm, uint offset, float clockdiv, uint sync_pin) {
-  pio_sm_config c = cvsync_program_get_default_config(offset);
+  pio_sm_config c;
+#if CVIDEO_INTERLACED
+  c = cvsync_interlaced_program_get_default_config(offset);
+#else
+  c = cvsync_progressive_program_get_default_config(offset);
+#endif
 
   // Map the state machine's OUT and SIDE pin group to one pin, namely the `pin`
   // parameter to this function.
@@ -115,8 +125,12 @@ static inline void cvsync_program_init(PIO pio, uint sm, uint offset, float cloc
   // Load our configuration, and jump to the start of the program
   pio_sm_init(pio, sm, offset, &c);
 
-  // Tell the state machine the number of video lines per frame (minus 1)
+  // Tell the state machine the number of video lines (minus 1)
+#if CVIDEO_INTERLACED
+  pio_sm_put(pio, sm, (CVIDEO_LINES / 2) - 1);
+#else
   pio_sm_put(pio, sm, CVIDEO_LINES - 1);
+#endif
   pio_sm_exec(pio, sm, 0x80a0); // pull side 0
 
   // Set the state machine running

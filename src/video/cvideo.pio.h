@@ -10,15 +10,15 @@
 
 #define CLOCKS_PER_BIT 6
 
-// ------ //
-// cvsync //
-// ------ //
+// ------------------ //
+// cvsync_progressive //
+// ------------------ //
 
-#define cvsync_wrap_target 0
-#define cvsync_wrap 18
-#define cvsync_pio_version 0
+#define cvsync_progressive_wrap_target 0
+#define cvsync_progressive_wrap 18
+#define cvsync_progressive_pio_version 0
 
-static const uint16_t cvsync_program_instructions[] = {
+static const uint16_t cvsync_progressive_program_instructions[] = {
             //     .wrap_target
     0xfe24, //  0: set    x, 4            side 1 [14]
     0xa042, //  1: nop                    side 0
@@ -43,19 +43,76 @@ static const uint16_t cvsync_program_instructions[] = {
 };
 
 #if !PICO_NO_HARDWARE
-static const struct pio_program cvsync_program = {
-    .instructions = cvsync_program_instructions,
+static const struct pio_program cvsync_progressive_program = {
+    .instructions = cvsync_progressive_program_instructions,
     .length = 19,
     .origin = -1,
-    .pio_version = cvsync_pio_version,
+    .pio_version = cvsync_progressive_pio_version,
 #if PICO_PIO_VERSION > 0
     .used_gpio_ranges = 0x0
 #endif
 };
 
-static inline pio_sm_config cvsync_program_get_default_config(uint offset) {
+static inline pio_sm_config cvsync_progressive_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
-    sm_config_set_wrap(&c, offset + cvsync_wrap_target, offset + cvsync_wrap);
+    sm_config_set_wrap(&c, offset + cvsync_progressive_wrap_target, offset + cvsync_progressive_wrap);
+    sm_config_set_sideset(&c, 1, false, false);
+    return c;
+}
+#endif
+
+// ----------------- //
+// cvsync_interlaced //
+// ----------------- //
+
+#define cvsync_interlaced_wrap_target 0
+#define cvsync_interlaced_wrap 24
+#define cvsync_interlaced_pio_version 0
+
+static const uint16_t cvsync_interlaced_program_instructions[] = {
+            //     .wrap_target
+    0x0063, //  0: jmp    !y, 3           side 0
+    0xf023, //  1: set    x, 3            side 1
+    0x1d04, //  2: jmp    4               side 1 [13]
+    0xfe24, //  3: set    x, 4            side 1 [14]
+    0xa042, //  4: nop                    side 0
+    0x1e44, //  5: jmp    x--, 4          side 1 [14]
+    0xed24, //  6: set    x, 4            side 0 [13]
+    0x1129, //  7: jmp    !x, 9           side 1 [1]
+    0x0d47, //  8: jmp    x--, 7          side 0 [13]
+    0x006c, //  9: jmp    !y, 12          side 0
+    0xf022, // 10: set    x, 2            side 1
+    0x1c0d, // 11: jmp    13              side 1 [12]
+    0xfd23, // 12: set    x, 3            side 1 [13]
+    0xb04a, // 13: mov    y, ~y           side 1
+    0xa042, // 14: nop                    side 0
+    0x1e4e, // 15: jmp    x--, 14         side 1 [14]
+    0xe130, // 16: set    x, 16           side 0 [1]
+    0xbe42, // 17: nop                    side 1 [14]
+    0x1e34, // 18: jmp    !x, 20          side 1 [14]
+    0x0151, // 19: jmp    x--, 17         side 0 [1]
+    0xa127, // 20: mov    x, osr          side 0 [1]
+    0xb242, // 21: nop                    side 1 [2]
+    0xdd00, // 22: irq    nowait 0        side 1 [13]
+    0x1c20, // 23: jmp    !x, 0           side 1 [12]
+    0x0155, // 24: jmp    x--, 21         side 0 [1]
+            //     .wrap
+};
+
+#if !PICO_NO_HARDWARE
+static const struct pio_program cvsync_interlaced_program = {
+    .instructions = cvsync_interlaced_program_instructions,
+    .length = 25,
+    .origin = -1,
+    .pio_version = cvsync_interlaced_pio_version,
+#if PICO_PIO_VERSION > 0
+    .used_gpio_ranges = 0x0
+#endif
+};
+
+static inline pio_sm_config cvsync_interlaced_program_get_default_config(uint offset) {
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + cvsync_interlaced_wrap_target, offset + cvsync_interlaced_wrap);
     sm_config_set_sideset(&c, 1, false, false);
     return c;
 }
