@@ -21,9 +21,13 @@ char CMD_CHANNEL_INFO[] = { 0x1F, 0x00 };
 // Byte 1-4: Optional value (32-bit little-endian integer)
 char CMD_GET_CONTACTS[] = { 0x04, 0x00, 0x00, 0x00, 0x00 };
 
-// Byte 0: 0x0D
-// Byte 1: Firmware Version (uint8)
-// Bytes 2+: Variable length based on firmware version
+// Byte 0: 0x02
+// Byte 1: Text Type (0 = plain)
+// Byte 2: Attempt (0-3)
+// Bytes 3-6: Sender Timestamp (32-bit little-endian)
+// Bytes 7-12: Public Key Prefix (6 bytes)
+// Bytes 13+: Message Text (UTF-8, max length: 160 bytes)
+char CMD_SEND_TXT_MSG[] = { 0x02 };
 
 // Byte 0: 0x00
 // Bytes 1-4: Optional value (32-bit little-endian integer)

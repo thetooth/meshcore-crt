@@ -53,33 +53,67 @@ public:
       auto command = inputBuffer.substring(0, inputBuffer.length() - 1);
       inputBuffer = "";
 
-      if (command == "/help") {
-        console.print("Available commands:");
-        console.print("/clear - Clear the console");
-        console.print("/self - Show self information");
-        console.print("/list chan,contact - Request channel or contact list");
-        return;
-      }
-      if (command == "/clear") {
-        console.clear();
-        return;
-      }
-      if (command.startsWith("/self")) {
-        console.print(client.self.deviceName);
-        console.print("Freq " + String(client.self.radioFreq) + " MHz");
-        console.print("BW   " + String(client.self.radioBandwidth) + " kHz");
-        console.print("SF   " + String(client.self.radioSpreadingFactor));
-        console.print("CR   " + String(client.self.radioCodingRate));
-      }
-      if (command.startsWith("/list")) {
-        if (command.endsWith("chan")) {
-          for (int i = 0; i < client.channels.size(); i++) {
-            auto &ch = client.channels.at(i);
-            console.print("CH " + String(i) + ": " + ch.name);
+      if (command.startsWith("/")) {
+        if (command == "/help") {
+          console.print("Available commands:");
+          console.print("/clear - Clear the console");
+          console.print("/self - Show self information");
+          console.print("/list chan,contact - Request channel or contact list");
+          return;
+        } else if (command == "/clear") {
+          console.clear();
+          return;
+        } else if (command.startsWith("/self")) {
+          console.print(client.self.deviceName);
+          console.print("Freq " + String(client.self.radioFreq) + " MHz");
+          console.print("BW   " + String(client.self.radioBandwidth) + " kHz");
+          console.print("SF   " + String(client.self.radioSpreadingFactor));
+          console.print("CR   " + String(client.self.radioCodingRate));
+        } else if (command.startsWith("/list")) {
+          if (command.endsWith("chan")) {
+            for (int i = 0; i < client.channels.size(); i++) {
+              auto &ch = client.channels.at(i);
+              console.print("CH " + String(i) + ": " + ch.name);
+            }
+          } else if (command.endsWith("contact")) {
+            for (const auto &[_, contact] : client.contacts) {
+              console.print("CON: " + contact.advName);
+            }
           }
-        } else if (command.endsWith("contact")) {
+        } else if (command.startsWith("/to ")) {
+          arduino::String pubKeyPrefix = "";
+          auto recipient = command.substring(4);
+          recipient.trim();
+          // Find in contacts
           for (const auto &[_, contact] : client.contacts) {
-            console.print("CON: " + contact.advName);
+            if (contact.advName == recipient) {
+              pubKeyPrefix = arduino::String(contact.pubKey, 6);
+              break;
+            }
+          }
+
+          if (pubKeyPrefix.length() == 0) {
+            console.print("Not found: " + recipient);
+            return;
+          }
+
+          client.toRecipient = pubKeyPrefix;
+          console.print("Set to " + recipient);
+          return;
+        } else {
+          console.print("Unknown command");
+          return;
+        }
+      } else {
+        // Message sending
+        if (command.length() > 0) {
+          if (client.toRecipient.length() <= 0) {
+            console.print("No recipient specified.");
+          } else {
+            client.sendTextMessage(command);
+
+            console.print("DIRECT " + client.self.deviceName + ":");
+            console.print(command);
           }
         }
       }

@@ -5,6 +5,7 @@
 #include "device.hpp"
 #include "packet.hpp"
 #include "self.hpp"
+#include "text.hpp"
 #include "ui/console.hpp"
 
 #include <Arduino.h>
@@ -84,13 +85,32 @@ public:
     send(REQ_NEXT, sizeof(REQ_NEXT));
   }
 
+  void sendTextMessage(const arduino::String &text, uint8_t type = 0, uint8_t attempts = 0) {
+    if (toRecipient.length() <= 0) {
+      console.print("No recipient specified.");
+      console.print("Use /to <name> to specify recipient.");
+      return;
+    }
+
+    char buf[256] = { 0 };
+    buf[0] = CMD_SEND_TXT_MSG[0];
+    buf[1] = type;
+    buf[2] = attempts;
+    writeU32LE((uint8_t *)buf + 3, millis());
+    memcpy(buf + 7, toRecipient.c_str(), 6);
+    memcpy(buf + 13, text.c_str(), text.length());
+
+    send(buf, 13 + text.length());
+  }
+
   void handleContactMsg(const CONTACT_MGS &msg) {
     auto pubKeyPrefix = arduino::String((char *)msg.pubKeyPrefix, 6);
 
     arduino::String name = "UNKNOWN";
     if (contacts.contains(pubKeyPrefix)) {
-      name = contacts.at(pubKeyPrefix).advName;
-      contacts.at(pubKeyPrefix).messages.push(msg.msg);
+      auto &c = contacts[pubKeyPrefix];
+      name = c.advName;
+      c.messages.push(msg.msg);
     }
 
     console.print("DIRECT " + name + ": ");
@@ -101,6 +121,7 @@ public:
   void handleChannelMsg(const CHANNEL_MSG &msg) {
     auto &ch = channels.at(msg.channelIndex);
     ch.messages.push(msg.msg);
+
     console.print("CHANNEL " + String(ch.name) + ": ");
     console.print(String(msg.msg));
     activity = true;
@@ -127,7 +148,7 @@ public:
       contact.outPathLen = data[offset++];
       memcpy(contact.outPath, data + offset, 64);
       offset += 64;
-      contact.advName = arduino::String((char *)data + offset, strnlen((char *)data + offset, 32));
+      contact.advName = Text::sanitizeUtf8ToAscii(data + offset, 32, true);
       offset += 32;
       contact.lastAdvert = readU32LE(data + offset);
       offset += 4;
@@ -154,7 +175,7 @@ public:
         offset += 4;
       }
 
-      console.print("Contacts: " + String(contacts.count));
+      // console.print("Contacts: " + String(contacts.count));
       activity = true;
 
       break;
@@ -170,7 +191,7 @@ public:
       auto payload = CHANNEL_INFO_MSG{};
 
       payload.channelIndex = data[offset++];
-      payload.name = arduino::String((char *)data + offset, strnlen((char *)data + offset, 32));
+      payload.name = Text::sanitizeUtf8ToAscii(data + offset, 32, true);
       offset += 32;
 
       // Secret is typically 20 bytes, but device returns 32 bytes total for name+secret, so we need to
@@ -210,7 +231,7 @@ public:
       offset += 4;
       payload.radioSpreadingFactor = data[offset++];
       payload.radioCodingRate = data[offset++];
-      payload.deviceName = arduino::String((char *)data + offset, strnlen((char *)data + offset, 32));
+      payload.deviceName = Text::sanitizeUtf8ToAscii(data + offset, 32, true);
       offset += 32;
 
       self.update(payload);
@@ -230,7 +251,7 @@ public:
         offset += 4;
       }
 
-      payload.msg = arduino::String(data + offset, len - offset);
+      payload.msg = Text::sanitizeUtf8ToAscii(data + offset, len - offset);
 
       handleContactMsg(payload);
     } break;
@@ -243,7 +264,7 @@ public:
       payload.timestamp = readU32LE(data + offset);
       offset += 4;
 
-      payload.msg = arduino::String(data + offset, len - offset);
+      payload.msg = Text::sanitizeUtf8ToAscii(data + offset, len - offset);
 
       handleChannelMsg(payload);
     } break;
@@ -264,6 +285,8 @@ public:
   bool msgWaiting = true;
 
   bool channelRequestStart = false;
+
+  arduino::String toRecipient;
 
   Device device;
   Self self;
