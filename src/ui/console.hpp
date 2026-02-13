@@ -39,7 +39,7 @@ public:
   }
 
   GFX &gfx;
-  static const int maxLines = 13;
+  static const int maxLines = 12;
   static const int maxCharsPerLine = 30;
   std::array<arduino::String, maxLines> lines;
 };

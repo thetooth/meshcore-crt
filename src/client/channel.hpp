@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <CircularBuffer.hpp>
 #include <functional>
 
 namespace MeshCore {
@@ -10,6 +11,13 @@ struct CHANNEL_INFO_MSG {
 };
 class Channel : public CHANNEL_INFO_MSG {
 public:
+  Channel() {}
+  void update(const CHANNEL_INFO_MSG &info) {
+    channelIndex = info.channelIndex;
+    name = info.name;
+  }
+
+  CircularBuffer<arduino::String, 10> messages;
 };
 class ChannelList : public std::array<Channel, 8> {
 public:

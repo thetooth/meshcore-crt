@@ -2,7 +2,9 @@
 
 #include "channel.hpp"
 #include "contact.hpp"
+#include "device.hpp"
 #include "packet.hpp"
+#include "self.hpp"
 #include "ui/console.hpp"
 
 #include <Arduino.h>
@@ -56,16 +58,6 @@ public:
   // An inbound frame starts with byte 60 (ASCII '<'), then 2 bytes with frame length, followed by actual
   // frame.
   void send(const char *data, uint16_t len) {
-    Serial.print("Sending frame: ");
-    Serial.print('<', HEX);
-    Serial.print(len, HEX);
-    Serial.print(len >> 8, HEX);
-    for (int i = 0; i < len; i++) {
-      Serial.print((uint8_t)data[i], HEX);
-      Serial.print(" ");
-    }
-    Serial.println();
-
     Serial1.write("<");
     Serial1.write(len);
     Serial1.write(len >> 8);
@@ -100,6 +92,7 @@ public:
     arduino::String name = "UNKNOWN";
     if (contacts.contains(pubKeyPrefix)) {
       name = contacts.at(pubKeyPrefix).advName;
+      contacts.at(pubKeyPrefix).messages.push(msg.msg);
     }
 
     console.print("DIRECT " + name + ": ");
@@ -109,6 +102,7 @@ public:
 
   void handleChannelMsg(const CHANNEL_MSG &msg) {
     auto &ch = channels.at(msg.channelIndex);
+    ch.messages.push(msg.msg);
     console.print("CHANNEL " + String(ch.name) + ": ");
     console.print(String(msg.msg));
     activity = true;
@@ -117,9 +111,6 @@ public:
   void handlePacket(uint8_t *data, uint16_t len) {
     uint8_t offset = 0;
     uint8_t type = data[offset++];
-
-    // Serial.print("Packet type: ");
-    // Serial.println(type, HEX);
 
     switch (type) {
     case PACKET_CONTACT_START:
@@ -155,17 +146,9 @@ public:
       // prefix for messages
       auto pubKeyPrefix = arduino::String((char *)contact.pubKey, 6);
 
-      Serial.println("Received contact: " + contact.advName + " with pubKeyPrefix: ");
-      for (int i = 0; i < 6; i++) {
-        Serial.print((uint8_t)contact.pubKey[i], HEX);
-        Serial.print(" ");
-      }
-      Serial.println();
-      Serial.println("Adv: " + String(contact.advLat) + ", " + String(contact.advLon));
-      Serial.println("Last Advert: " + String(contact.lastAdvert));
-      Serial.println("Last Mod: " + String(contact.lastMod));
+      auto &c = contacts[pubKeyPrefix];
 
-      contacts[pubKeyPrefix] = Contact{ contact };
+      c.update(contact);
     } break;
     case PACKET_CONTACT_END:
       if (len > 1) {
@@ -202,12 +185,37 @@ public:
       memcpy(secret, data + offset, secretLen);
       offset += secretLen;
 
-      channels.at(payload.channelIndex) = Channel{ payload };
+      auto &ch = channels[payload.channelIndex];
+
+      ch.update(payload);
       channels.lastSyncOK = true;
-      // console.print("CHANNEL INFO: " + String(payload.channelIndex) + " - " + payload.name);
     } break;
     case PACKET_SELF_INFO: {
-      Serial.println("Received self info packet");
+      auto payload = SELF_INFO_MSG{};
+
+      payload.advType = data[offset++];
+      payload.txPower = data[offset++];
+      payload.maxTxPower = data[offset++];
+      memcpy(payload.publicKey, data + offset, 32);
+      offset += 32;
+      payload.advLat = readS32LE(data + offset);
+      offset += 4;
+      payload.advLon = readS32LE(data + offset);
+      offset += 4;
+      payload.multiAck = data[offset++];
+      payload.advLocPolicy = data[offset++];
+      payload.telemetryMode = data[offset++];
+      payload.manualAddContacts = data[offset++] != 0;
+      payload.radioFreq = readU32LE(data + offset) / 1000.0;
+      offset += 4;
+      payload.radioBandwidth = readU32LE(data + offset) / 1000.0;
+      offset += 4;
+      payload.radioSpreadingFactor = data[offset++];
+      payload.radioCodingRate = data[offset++];
+      payload.deviceName = arduino::String((char *)data + offset, strnlen((char *)data + offset, 32));
+      offset += 32;
+
+      self.update(payload);
     } break;
     case PACKET_CONTACT_MSG_RECV: {
       auto payload = CONTACT_MGS{};
@@ -251,9 +259,10 @@ public:
   bool activity = false;
   bool msgWaiting = true;
 
+  Device device;
+  Self self;
   ChannelList channels;
   ContactList contacts;
-  // std::array<Contact, 350> contacts;
 
 private:
   UI::Console &console;

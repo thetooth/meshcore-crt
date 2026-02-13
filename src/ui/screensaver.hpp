@@ -9,8 +9,8 @@ void screensaver(GFX &gfx) {
   static int y = gfx.height / 2;
   static bool xDir;
   static bool yDir;
-  static int size = 16;
-  static int speed = 2;
+  static int size = 8;
+  static int speed = 1;
   if (xDir) {
     x += speed;
   } else {

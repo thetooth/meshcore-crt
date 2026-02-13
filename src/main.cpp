@@ -86,6 +86,8 @@ void setup() {
       client.activity = false;
     }
 
+    terminalClient();
+
     ts.execute();
     renderer_run();
   }
@@ -114,17 +116,41 @@ arduino::String readSerial() {
 void terminalClient() {
   inputBuffer += readSerial();
   // Backspace handling
-  if ((inputBuffer.endsWith("\b") || inputBuffer.endsWith("\x7F")) && inputBuffer.length() > 1) {
-    inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 2);
+  if ((inputBuffer.endsWith("\b") || inputBuffer.endsWith("\x7F")) && inputBuffer.length() >= 1) {
+    if (inputBuffer.length() >= 2) {
+      inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 2);
+    } else {
+      inputBuffer = "";
+    }
+  }
+  // Tab handling
+  if (inputBuffer.endsWith("\t")) {
+    if (inputBuffer.startsWith("/to ")) {
+      auto partialName = inputBuffer.substring(4, inputBuffer.length() - 1);
+      for (const auto &[_, contact] : client.contacts) {
+        if (contact.advName.startsWith(partialName)) {
+          inputBuffer = "/to " + contact.advName + " ";
+          break;
+        }
+      }
+    } else {
+      inputBuffer = inputBuffer.substring(0, inputBuffer.length() - 1);
+    }
   }
   // Command handling
   if (inputBuffer.endsWith("\r") || inputBuffer.endsWith("\n")) {
     auto command = inputBuffer.substring(0, inputBuffer.length() - 1);
     inputBuffer = "";
 
-    console.print("> ");
-
-    if (command == "/clr") {
+    if (command == "/help") {
+      console.print("Available commands:");
+      console.print("/clear - Clear the console");
+      console.print("/sleep - Enter sleep mode with screensaver");
+      console.print("/self - Show self information");
+      console.print("/list chan,contact - Request channel or contact list");
+      return;
+    }
+    if (command == "/clear") {
       console.lines.fill("");
       return;
     }
@@ -133,27 +159,25 @@ void terminalClient() {
       sleep = true;
       return;
     }
-
-    Serial1.print(command + "\r\n");
-  }
-
-  if (Serial1.available()) {
-    coldBoot = false;
-    sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
-    if (sleep) {
-      sleep = false;
+    if (command.startsWith("/self")) {
+      console.print(client.self.deviceName);
+      console.print("Freq " + String(client.self.radioFreq) + " MHz");
+      console.print("BW   " + String(client.self.radioBandwidth) + " kHz");
+      console.print("SF   " + String(client.self.radioSpreadingFactor));
+      console.print("CR   " + String(client.self.radioCodingRate));
     }
-
-    auto c = (char)Serial1.read();
-    Serial.print(c);
-    if (c == '\n') {
-      console.ln();
-      return;
+    if (command.startsWith("/list")) {
+      if (command.endsWith("chan")) {
+        for (int i = 0; i < client.channels.size(); i++) {
+          auto &ch = client.channels.at(i);
+          console.print("CH " + String(i) + ": " + ch.name);
+        }
+      } else if (command.endsWith("contact")) {
+        for (const auto &[_, contact] : client.contacts) {
+          console.print("CON: " + contact.advName);
+        }
+      }
     }
-    if (c == '\r') {
-      return;
-    }
-    console.append(c);
   }
 }
 
@@ -163,7 +187,7 @@ void draw(void) {
   auto t0 = millis();
   frameCount++;
   if (millis() > sleepTimeout) {
-    // sleep = true;
+    sleep = true;
   }
   if (sleep) {
     UI::screensaver(gfx);
@@ -172,19 +196,19 @@ void draw(void) {
 
   if (!coldBoot) {
     // Draw 20x20 grid
-    unsigned int sz = frameCount % 3 == 0 && millis() < activityTimeout ? 8 : 2;
-    for (int x = 32; x < gfx.width - PADDING; x += 32) {
-      for (int y = 32; y < gfx.height - PADDING; y += 32) {
+    unsigned int sz = frameCount % 3 == 0 && millis() < activityTimeout ? 3 : 1;
+    for (int x = 16; x < gfx.width - PADDING; x += 16) {
+      for (int y = 16; y < gfx.height - PADDING; y += 16) {
         gfx.drawRect(x, y, sz, sz);
       }
     }
 
-    // // Render area box
-    // gfx.drawRect(0, 0, gfx.width, 1);
-    // gfx.drawRect(0, gfx.height, gfx.width, 1);
+    // Render area box
+    gfx.drawRect(0, 0, gfx.width, 1);
+    gfx.drawRect(0, gfx.height, gfx.width, 1);
 
-    // gfx.drawRect(0, 0, 2, gfx.height);
-    // gfx.drawRect(gfx.width, 0, 2, gfx.height);
+    gfx.drawRect(0, 0, 2, gfx.height);
+    gfx.drawRect(gfx.width, 0, 2, gfx.height);
   }
 
   if (coldBoot && frameCount % 4 == 0) {
@@ -193,14 +217,14 @@ void draw(void) {
 
   console.draw();
 
-  // prompt = "> " + inputBuffer;
+  prompt = "> " + inputBuffer;
 
-  // gfx.drawText(16, gfx.height - 48, 2, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
+  gfx.drawText(16, gfx.height - 24, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
 
-  // // Flashing cursor
-  // if ((millis() / 100) % 2 == 0) {
-  //   gfx.drawRect(16 + prompt.length() * 20, gfx.height - 48, 12, 24);
-  // }
+  // Flashing cursor
+  if ((millis() / 100) % 2 == 0) {
+    gfx.drawRect(16 + prompt.length() * 10, gfx.height - 24, 6, 12);
+  }
   auto t1 = millis() - t0;
   auto fps = arduino::String(t1) + "ms";
   gfx.drawText(gfx.width - 16, gfx.height - 48, 1, const_cast<char *>(fps.c_str()), fps.length(),
