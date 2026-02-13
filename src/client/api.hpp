@@ -71,9 +71,7 @@ public:
     send(cmd, sizeof(cmd));
   }
 
-  bool requestAllChannels() {
-    return channels.requestAll([this](uint8_t channelIndex) { requestChannelInfo(channelIndex); });
-  }
+  void requestChannels() { channelRequestStart = true; }
 
   void requestContacts() {
     auto cmd = CMD_GET_CONTACTS;
@@ -254,10 +252,18 @@ public:
       requestContacts();
     } break;
     }
+
+    if (channelRequestStart) {
+      if (channels.requestAll([this](uint8_t channelIndex) { requestChannelInfo(channelIndex); })) {
+        channelRequestStart = false;
+      }
+    }
   }
 
   bool activity = false;
   bool msgWaiting = true;
+
+  bool channelRequestStart = false;
 
   Device device;
   Self self;

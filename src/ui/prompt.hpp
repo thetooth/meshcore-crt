@@ -24,7 +24,7 @@ public:
     return result;
   }
 
-  void terminalClient() {
+  void receiveKeys() {
     inputBuffer += readSerial();
     // Backspace handling
     if ((inputBuffer.endsWith("\b") || inputBuffer.endsWith("\x7F")) && inputBuffer.length() >= 1) {

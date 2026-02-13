@@ -19,6 +19,8 @@
 void draw(void);
 
 #define PADDING             10
+#define KEY_DEBOUNCE_US     100 * 1000
+#define MSG_POLL_US         1000 * 1000
 #define SLEEP_TIMEOUT_MS    30000
 #define ACTIVITY_TIMEOUT_MS 1000
 
@@ -37,24 +39,10 @@ MeshCore::SerialInterface serialInterface(client);
 UI::Prompt prompt(client, console, sleep);
 
 Scheduler ts;
-// Task t1(10 * 1000, TASK_FOREVER, terminalClient, &ts, true);
-Task t2(1000, TASK_FOREVER, []() { serialInterface.receiveRadio(); }, &ts, true);
-Task t3(
-    1000 * 1000, TASK_FOREVER,
-    []() {
-      if (client.msgWaiting) {
-        client.requestNextMessage();
-      }
-    },
-    &ts, true);
-Task channelInfoTask(
-    1000, TASK_FOREVER,
-    []() {
-      if (client.requestAllChannels()) {
-        channelInfoTask.disable();
-      }
-    },
-    &ts, false);
+Task t1(KEY_DEBOUNCE_US, TASK_FOREVER, []() { prompt.receiveKeys(); }, &ts, true);
+Task t2(
+    MSG_POLL_US, TASK_FOREVER, []() { client.msgWaiting ? client.requestNextMessage() : (void)0; }, &ts,
+    true);
 
 void setup() {
   Serial.begin(115200);
@@ -67,18 +55,23 @@ void setup() {
   Serial.println("Renderer initialised");
 
   Serial1.setPinout(16, 17);
-  Serial1.setFIFOSize(512);
+  Serial1.setFIFOSize(256);
   Serial1.begin(115200);
 
   sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
 
   client.appStart();
-  channelInfoTask.delay(2000 * 1000);
-  channelInfoTask.enable();
+  client.requestChannels();
   client.requestContacts();
 
   while (1) {
-    // serialInterface.receiveRadio();
+    // Handle incoming radio data
+    serialInterface.receiveRadio();
+
+    // Run scheduled tasks (e.g., prompt input handling, message polling)
+    ts.execute();
+
+    // Power management / notifications
     if (client.activity) {
       activityTimeout = millis() + ACTIVITY_TIMEOUT_MS;
       client.activity = false;
@@ -92,9 +85,6 @@ void setup() {
       prompt.activity = false;
     }
 
-    prompt.terminalClient();
-
-    ts.execute();
     renderer_run();
   }
 }

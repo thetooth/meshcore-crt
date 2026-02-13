@@ -47,23 +47,7 @@ public:
         frameBuffer[frameIndex++] = b;
 
         if (frameIndex >= frameLength) {
-          if (frameDir == '>') {
-            // Serial.println("UART OUT");
-          } else if (frameDir == '<') {
-            // Serial.println("UART IN");
-          }
-
-          // Serial.println(" LEN " + String(frameLength));
-
-          // Serial.print("FRAME: ");
-          // for (int i = 0; i < frameLength; i++) {
-          // Serial.print(frameBuffer[i], HEX);
-          // Serial.print(" ");
-          // }
-          // Serial.println();
-
           client.handlePacket(frameBuffer, frameLength);
-
           radioState = RadioRxState::WaitStart;
         }
         break;
