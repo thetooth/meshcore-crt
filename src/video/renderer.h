@@ -23,7 +23,8 @@ void renderer_clear_default(void);
 
 void renderer_draw_rect(unsigned int x, unsigned int y, unsigned int width, unsigned int height);
 
-void renderer_draw_image(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char *data);
+void renderer_draw_image(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char *data,
+                         bool invert);
 
 void renderer_draw_character(unsigned int x, unsigned int y, unsigned int scale, char character, bool invert);
 

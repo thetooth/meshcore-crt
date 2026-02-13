@@ -141,8 +141,8 @@ void renderer_draw_rect(uint x, uint y, uint width, uint height) {
   }
 }
 
-void renderer_draw_image(unsigned int x, unsigned int y, unsigned int width, unsigned int height,
-                         char *data) {
+void renderer_draw_image(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char *data,
+                         bool invert) {
   if (drawing_in_progress) {
     for (int j = 0; j < height; j++) {
       for (int i = 0; i < width; i++) {
@@ -154,7 +154,7 @@ void renderer_draw_image(unsigned int x, unsigned int y, unsigned int width, uns
 
         uint8_t value = data[array_index] >> byte_position & 1;
         // XBM images use 1 for black, so invert values
-        set_bit(x + i, y + j, !value);
+        set_bit(x + i, y + j, invert ? value : !value);
       }
     }
   }

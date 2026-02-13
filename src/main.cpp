@@ -22,10 +22,9 @@ void draw(void);
 #define KEY_DEBOUNCE_US     100 * 1000
 #define MSG_POLL_US         1000 * 1000
 #define SLEEP_TIMEOUT_MS    30000
-#define ACTIVITY_TIMEOUT_MS 1000
+#define ACTIVITY_TIMEOUT_MS 500
 
-char MSG_COLDBOOT[] = "AWAITING TELEMETRY";
-bool coldBoot = false;
+bool coldBoot = true;
 bool sleep = false;
 unsigned long sleepTimeout = 0;
 unsigned long activityTimeout = 0;
@@ -59,6 +58,7 @@ void setup() {
   Serial1.begin(115200);
 
   sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
+  t2.delay(3 * MSG_POLL_US);
 
   client.appStart();
   client.requestChannels();
@@ -74,7 +74,7 @@ void setup() {
     // Power management / notifications
     if (client.activity) {
       activityTimeout = millis() + ACTIVITY_TIMEOUT_MS;
-      client.activity = false;
+      coldBoot = false;
     }
 
     if (client.activity || prompt.activity) {
@@ -82,6 +82,7 @@ void setup() {
       if (sleep) {
         sleep = false;
       }
+      client.activity = false;
       prompt.activity = false;
     }
 
@@ -106,7 +107,7 @@ void draw(void) {
 
   if (!coldBoot) {
     // Draw 20x20 grid
-    unsigned int sz = frameCount % 3 == 0 && millis() < activityTimeout ? 3 : 1;
+    unsigned int sz = frameCount % 3 == 0 && millis() < activityTimeout ? 3 : 0;
     for (int x = 16; x < gfx.width - PADDING; x += 16) {
       for (int y = 16; y < gfx.height - PADDING; y += 16) {
         gfx.drawRect(x, y, sz, sz);
@@ -122,15 +123,18 @@ void draw(void) {
   }
 
   if (coldBoot && frameCount % 4 == 0) {
-    gfx.drawText(gfx.width / 2, gfx.height / 2, 3, MSG_COLDBOOT, sizeof(MSG_COLDBOOT) - 1, JUSTIFY_CENTRE);
+    gfx.drawImage((gfx.width - meshcore_width) / 2, (gfx.height - meshcore_height) / 2, meshcore_width,
+                  meshcore_height, (char *)meshcore_bits, true);
   }
 
   console.draw(gfx);
 
   prompt.draw(gfx);
 
+#ifdef DEBUG
   auto t1 = millis() - t0;
   auto fps = arduino::String(t1) + "ms";
   gfx.drawText(gfx.width - 16, gfx.height - 48, 1, const_cast<char *>(fps.c_str()), fps.length(),
                JUSTIFY_RIGHT);
+#endif
 }
