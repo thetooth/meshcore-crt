@@ -29,6 +29,13 @@ char CMD_GET_CONTACTS[] = { 0x04, 0x00, 0x00, 0x00, 0x00 };
 // Bytes 13+: Message Text (UTF-8, max length: 160 bytes)
 char CMD_SEND_TXT_MSG[] = { 0x02 };
 
+// Byte 0: 0x03
+// Byte 1: Text Type (0 = plain)
+// Byte 2: Channel Index (0-7)
+// Bytes 3-6: Sender Timestamp (32-bit little-endian)
+// Bytes 7+: Message Text (UTF-8, max length: 160 bytes)
+char CMD_SEND_CHANNEL_MSG[] = { 0x03 };
+
 // Byte 0: 0x00
 // Bytes 1-4: Optional value (32-bit little-endian integer)
 constexpr uint8_t PACKET_OK = 0x00;

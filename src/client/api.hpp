@@ -108,6 +108,30 @@ public:
     memcpy(buf + 13, text.c_str(), text.length());
 
     send(buf, 13 + text.length());
+
+    console.print("\xAB " + self.deviceName, true);
+    console.print(text);
+  }
+
+  void sendChannelMessage(const arduino::String &text, uint8_t type = 0) {
+    if (toChannel == -1) {
+      console.print("No channel specified.");
+      console.print("Use /to <channel name> to specify channel.");
+      return;
+    }
+
+    char buf[256] = { 0 };
+    buf[0] = CMD_SEND_CHANNEL_MSG[0];
+    buf[1] = type;
+    buf[2] = toChannel;
+    writeU32LE((uint8_t *)buf + 3, millis());
+    memcpy(buf + 7, text.c_str(), text.length());
+
+    send(buf, 7 + text.length());
+
+    auto &ch = channels.at(toChannel);
+    console.print("\xAB " + ch.name, true);
+    console.print(text);
   }
 
   void handleContactMsg(const CONTACT_MGS &msg) {
@@ -120,7 +144,7 @@ public:
       c.messages.push(msg.msg);
     }
 
-    console.print("DIRECT " + name + ": ");
+    console.print("\xBB " + name, true);
     console.print(String(msg.msg));
     activity = true;
   }
@@ -129,7 +153,7 @@ public:
     auto &ch = channels.at(msg.channelIndex);
     ch.messages.push(msg.msg);
 
-    console.print("CHANNEL " + String(ch.name) + ": ");
+    console.print("\xBB " + String(ch.name), true);
     console.print(String(msg.msg));
     activity = true;
   }
@@ -140,14 +164,14 @@ public:
 
     switch (type) {
     case PACKET_OK:
-      console.print("OK");
+      // console.print("OK", true);
       break;
     case PACKET_ERR: {
       if (len > 1) {
         uint8_t errCode = data[offset++];
-        console.print("ERR: " + String(errCode));
+        console.print("ERR: " + String(errCode), true);
       } else {
-        console.print("ERR");
+        console.print("ERR", true);
       }
     } break;
     case PACKET_CONTACT_START:
@@ -198,11 +222,9 @@ public:
 
       break;
     case PACKET_MESSAGES_WAITING:
-      Serial.println("Messages waiting!");
       msgWaiting = true;
       break;
     case PACKET_NO_MORE_MSGS:
-      Serial.println("No more messages.");
       msgWaiting = false;
       break;
     case PACKET_CHANNEL_INFO: {
@@ -298,7 +320,6 @@ public:
       handleChannelMsg(payload);
     } break;
     case PACKET_ADVERTISEMENT: {
-      Serial.println("Received advertisement packet");
       requestContacts();
     } break;
     case PACKET_ACK: {
@@ -309,7 +330,7 @@ public:
                              [&ack](const arduino::String &expectedAck) { return expectedAck.equals(ack); });
       if (it != sendQueue.end()) {
         sendQueue.erase(it);
-        console.print("ACK");
+        console.print("ACK", true);
       }
     } break;
     }
@@ -327,6 +348,7 @@ public:
   bool channelRequestStart = false;
 
   arduino::String toRecipient;
+  int toChannel = -1;
 
   Device device;
   Self self;

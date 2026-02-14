@@ -38,8 +38,18 @@ public:
     if (inputBuffer.endsWith("\t")) {
       if (inputBuffer.startsWith("/to ")) {
         auto partialName = inputBuffer.substring(4, inputBuffer.length() - 1);
+        // Find in channels
+        for (int i = 0; i < client.channels.size(); i++) {
+          auto &ch = client.channels.at(i);
+          if (ch.name.startsWith(partialName)) {
+            inputBuffer = "/to " + ch.name + " ";
+            break;
+          }
+        }
+
+        // Find in contacts
         for (const auto &[_, contact] : client.contacts) {
-          if (contact.advName.startsWith(partialName)) {
+          if (contact.advName.startsWith(partialName) && (contact.type == 1 || contact.type == 2)) {
             inputBuffer = "/to " + contact.advName + " ";
             break;
           }
@@ -66,10 +76,10 @@ public:
           return;
         } else if (command.startsWith("/self")) {
           console.print(client.self.deviceName);
-          console.print("Freq " + String(client.self.radioFreq) + " MHz");
-          console.print("BW   " + String(client.self.radioBandwidth) + " kHz");
-          console.print("SF   " + String(client.self.radioSpreadingFactor));
-          console.print("CR   " + String(client.self.radioCodingRate));
+          console.print("Freq " + String(client.self.radioFreq) + " MHz   BW " +
+                        String(client.self.radioBandwidth) + " kHz");
+          console.print("SF   " + String(client.self.radioSpreadingFactor) + "   CR   " +
+                        String(client.self.radioCodingRate));
         } else if (command.startsWith("/list")) {
           if (command.endsWith("channel")) {
             for (int i = 0; i < client.channels.size(); i++) {
@@ -91,40 +101,63 @@ public:
               console.print("REP: " + contact.advName);
             }
           }
-        } else if (command.startsWith("/to ")) {
+        } else if (command.startsWith("/to")) {
           arduino::String pubKeyPrefix = "";
+          int channelIndex = -1;
           auto recipient = command.substring(4);
           recipient.trim();
+
+          if (recipient.length() == 0) {
+            client.toRecipient = "";
+            client.toChannel = -1;
+            return;
+          }
+
+          // Find in channels
+          for (int i = 0; i < client.channels.size(); i++) {
+            auto &ch = client.channels.at(i);
+            if (ch.name == recipient) {
+              channelIndex = i;
+              break;
+            }
+          }
+
           // Find in contacts
           for (const auto &[_, contact] : client.contacts) {
-            if (contact.advName == recipient) {
+            if (contact.advName == recipient && (contact.type == 1 || contact.type == 2)) {
               pubKeyPrefix = arduino::String(contact.pubKey, 6);
               break;
             }
           }
 
-          if (pubKeyPrefix.length() == 0) {
-            console.print("Not found: " + recipient);
+          if (pubKeyPrefix.length() == 0 && channelIndex == -1) {
+            console.print("Not found: " + recipient, true);
             return;
           }
 
-          client.toRecipient = pubKeyPrefix;
-          console.print("Set to " + recipient);
+          if (pubKeyPrefix.length() > 0) {
+            client.toRecipient = pubKeyPrefix;
+            client.toChannel = -1;
+          } else if (channelIndex != -1) {
+            client.toRecipient = "";
+            client.toChannel = channelIndex;
+          }
+
+          // console.print("Recipient: " + recipient, true);
           return;
         } else {
-          console.print("Unknown command");
+          console.print("Unknown command", true);
           return;
         }
       } else {
         // Message sending
         if (command.length() > 0) {
-          if (client.toRecipient.length() <= 0) {
-            console.print("No recipient specified.");
-          } else {
+          if (client.toChannel != -1) {
+            client.sendChannelMessage(command);
+          } else if (client.toRecipient.length() > 0) {
             client.sendTextMessage(command);
-
-            console.print("DIRECT " + client.self.deviceName + ":");
-            console.print(command);
+          } else {
+            console.print("No recipient specified.", true);
           }
         }
       }
@@ -132,7 +165,13 @@ public:
   }
 
   void draw(GFX &gfx) {
-    prompt = "> " + inputBuffer;
+    if (client.toChannel != -1) {
+      prompt = client.channels.at(client.toChannel).name + "> " + inputBuffer;
+    } else if (client.toRecipient.length() > 0 && client.contacts.contains(client.toRecipient)) {
+      prompt = client.contacts[client.toRecipient].advName + "> " + inputBuffer;
+    } else {
+      prompt = "> " + inputBuffer;
+    }
 
     gfx.drawText(0, gfx.height - 24, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
 

@@ -19,20 +19,15 @@ public:
 
     for (int i = 0; i < renderedLines; i++) {
       const int index = start + i;
-      gfx.drawText(0, 16 + (i * 16), 1, const_cast<char *>(buffer[index].c_str()), buffer[index].length(),
-                   JUSTIFY_LEFT);
+      gfx.drawText(0, 16 + (i * 16), 1, const_cast<char *>(std::get<0>(buffer[index]).c_str()),
+                   std::get<0>(buffer[index]).length(), JUSTIFY_LEFT, std::get<1>(buffer[index]));
     }
   }
 
-  void print(const arduino::String &text, bool newLine = true, bool wrap = true) {
-    if (newLine) {
-      ln();
-    }
-    if (wrap) {
-      wrapText(text);
-    } else {
-      currentLine() = text.substring(0, maxCharsPerLine);
-    }
+  void print(const arduino::String &text, bool accent = false) {
+    ln();
+    currentLineAccent() = accent;
+    wrapText(text);
   }
 
   void append(const char c) {
@@ -55,11 +50,12 @@ public:
     }
 
     currentLine() = "";
+    currentLineAccent() = false;
     clampScrollOffset();
   }
 
   void clear() {
-    buffer.fill("");
+    buffer.fill(std::make_tuple("", false));
     lineCount = 1;
     scrollOffset = 0;
   }
@@ -80,7 +76,8 @@ public:
   void scrollReset() { scrollOffset = 0; }
 
 private:
-  arduino::String &currentLine() { return buffer[lineCount - 1]; }
+  arduino::String &currentLine() { return std::get<0>(buffer[lineCount - 1]); }
+  bool &currentLineAccent() { return std::get<1>(buffer[lineCount - 1]); }
 
   int maxScrollOffset() const {
     const int maxOffset = lineCount - maxLines;
@@ -161,7 +158,7 @@ private:
   static const int maxLines = 12;
   static const int maxBufferLines = 256;
   static const int maxCharsPerLine = 30;
-  std::array<arduino::String, maxBufferLines> buffer;
+  std::array<std::tuple<arduino::String, bool>, maxBufferLines> buffer;
   int lineCount = 1;
   int scrollOffset = 0;
 };
