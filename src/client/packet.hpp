@@ -65,7 +65,7 @@ constexpr uint8_t PACKET_SELF_INFO = 0x05;
 // Byte 0: 0x06
 // Byte 1: Message Type
 // Bytes 2-5: Expected ACK (4 bytes, hex)
-// Bytes 6-9: Suggested Timeout (32-bit little-endian, seconds)
+// Bytes 6-9: Suggested Timeout (32-bit little-endian, milliseconds)
 constexpr uint8_t PACKET_MSG_SENT = 0x06;
 // Byte 0: 0x07 (packet type)
 // Bytes 1-6: Public Key Prefix (6 bytes, hex)

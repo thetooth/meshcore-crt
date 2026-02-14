@@ -155,7 +155,7 @@ private:
     wrapWord(word);
   }
 
-  static const int maxLines = 12;
+  static const int maxLines = 13;
   static const int maxBufferLines = 256;
   static const int maxCharsPerLine = 30;
   std::array<std::tuple<arduino::String, bool>, maxBufferLines> buffer;

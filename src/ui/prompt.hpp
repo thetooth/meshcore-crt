@@ -173,11 +173,11 @@ public:
       prompt = "> " + inputBuffer;
     }
 
-    gfx.drawText(0, gfx.height - 24, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
+    gfx.drawText(0, gfx.height - 12, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
 
     // Flashing cursor
     if ((millis() / 100) % 2 == 0) {
-      gfx.drawRect(prompt.length() * 10, gfx.height - 24, 6, 12);
+      gfx.drawRect(prompt.length() * 10, gfx.height - 12, 6, 12);
     }
   }
 

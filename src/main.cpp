@@ -21,11 +21,12 @@ void draw(void);
 #define PADDING             10
 #define KEY_DEBOUNCE_US     10 * 1000
 #define MSG_POLL_US         1000 * 1000
-#define SLEEP_TIMEOUT_MS    30000
+#define LOGO_TIME_MS        1000
+#define SLEEP_TIMEOUT_MS    60000
 #define ACTIVITY_TIMEOUT_MS 500
 
-bool coldBoot = true;
 bool sleep = false;
+unsigned long logoTimeout = 0;
 unsigned long sleepTimeout = 0;
 unsigned long activityTimeout = 0;
 
@@ -58,6 +59,7 @@ void setup() {
   Serial1.begin(115200);
 
   sleepTimeout = millis() + SLEEP_TIMEOUT_MS;
+  logoTimeout = millis() + LOGO_TIME_MS;
   t2.delay(3 * MSG_POLL_US);
 
   client.appStart();
@@ -74,7 +76,6 @@ void setup() {
     // Power management / notifications
     if (client.activity) {
       activityTimeout = millis() + ACTIVITY_TIMEOUT_MS;
-      coldBoot = false;
       console.scrollReset();
     }
 
@@ -106,7 +107,15 @@ void draw(void) {
     return;
   }
 
-  if (!coldBoot) {
+  arduino::String header = "";
+  if (client.sendQueue.size() > 0 && millis() < client.sendTimeout) {
+    header += "SENDING";
+  }
+  if (frameCount % 60 < 30) {
+    gfx.drawText(gfx.width, 0, 1, const_cast<char *>(header.c_str()), header.length(), JUSTIFY_RIGHT, true);
+  }
+
+  if (millis() > logoTimeout) {
     // Draw 20x20 grid
     unsigned int sz = frameCount % 3 == 0 && millis() < activityTimeout ? 3 : 0;
     for (int x = 16; x < gfx.width - PADDING; x += 16) {
@@ -123,11 +132,11 @@ void draw(void) {
       gfx.drawRect(0, 0, 2, gfx.height);
       gfx.drawRect(gfx.width, 0, 2, gfx.height);
     }
-  }
 
-  if (coldBoot && frameCount % 4 == 0) {
+  } else if (frameCount % 4 == 0) {
     gfx.drawImage((gfx.width - meshcore_width) / 2, (gfx.height - meshcore_height) / 2, meshcore_width,
                   meshcore_height, (char *)meshcore_bits, true);
+    activityTimeout = millis() + ACTIVITY_TIMEOUT_MS;
   }
 
   console.draw(gfx);

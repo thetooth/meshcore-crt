@@ -35,7 +35,7 @@ struct CHANNEL_MSG {
 struct MSG_SENT_MSG {
   uint8_t type;
   char expectedAck[4];
-  uint32_t timestamp;
+  uint32_t timeout;
 };
 
 class Client {
@@ -216,10 +216,6 @@ public:
         contacts.since = readU32LE(data + offset);
         offset += 4;
       }
-
-      // console.print("Contacts: " + String(contacts.count));
-      activity = true;
-
       break;
     case PACKET_MESSAGES_WAITING:
       msgWaiting = true;
@@ -282,9 +278,10 @@ public:
       payload.type = data[offset++];
       memcpy(payload.expectedAck, data + offset, 4);
       offset += 4;
-      payload.timestamp = readU32LE(data + offset);
+      payload.timeout = readU32LE(data + offset);
       offset += 4;
 
+      sendTimeout = millis() + payload.timeout + 500;
       sendQueue.push_back(arduino::String((char *)payload.expectedAck, 4));
     } break;
     case PACKET_CONTACT_MSG_RECV: {
@@ -355,6 +352,7 @@ public:
   ChannelList channels;
   ContactList contacts;
   std::vector<arduino::String> sendQueue;
+  uint32_t sendTimeout = 0;
 
 private:
   UI::Console &console;
