@@ -9,6 +9,7 @@
 #include "ui/console.hpp"
 
 #include <Arduino.h>
+#include <algorithm>
 #include <array>
 #include <map>
 #include <stdint.h>
@@ -29,6 +30,12 @@ struct CHANNEL_MSG {
   uint8_t type;
   uint32_t timestamp;
   arduino::String msg;
+};
+
+struct MSG_SENT_MSG {
+  uint8_t type;
+  char expectedAck[4];
+  uint32_t timestamp;
 };
 
 class Client {
@@ -132,6 +139,17 @@ public:
     uint8_t type = data[offset++];
 
     switch (type) {
+    case PACKET_OK:
+      console.print("OK");
+      break;
+    case PACKET_ERR: {
+      if (len > 1) {
+        uint8_t errCode = data[offset++];
+        console.print("ERR: " + String(errCode));
+      } else {
+        console.print("ERR");
+      }
+    } break;
     case PACKET_CONTACT_START:
       contacts.clear();
       contacts.count = readU32LE(data + offset);
@@ -236,6 +254,17 @@ public:
 
       self.update(payload);
     } break;
+    case PACKET_MSG_SENT: {
+      auto payload = MSG_SENT_MSG{};
+
+      payload.type = data[offset++];
+      memcpy(payload.expectedAck, data + offset, 4);
+      offset += 4;
+      payload.timestamp = readU32LE(data + offset);
+      offset += 4;
+
+      sendQueue.push_back(arduino::String((char *)payload.expectedAck, 4));
+    } break;
     case PACKET_CONTACT_MSG_RECV: {
       auto payload = CONTACT_MGS{};
 
@@ -272,6 +301,17 @@ public:
       Serial.println("Received advertisement packet");
       requestContacts();
     } break;
+    case PACKET_ACK: {
+      arduino::String ack = arduino::String((char *)data + offset, 4);
+
+      // Remove matching expected ACK from send queue
+      auto it = std::find_if(sendQueue.begin(), sendQueue.end(),
+                             [&ack](const arduino::String &expectedAck) { return expectedAck.equals(ack); });
+      if (it != sendQueue.end()) {
+        sendQueue.erase(it);
+        console.print("ACK");
+      }
+    } break;
     }
 
     if (channelRequestStart) {
@@ -292,6 +332,7 @@ public:
   Self self;
   ChannelList channels;
   ContactList contacts;
+  std::vector<arduino::String> sendQueue;
 
 private:
   UI::Console &console;

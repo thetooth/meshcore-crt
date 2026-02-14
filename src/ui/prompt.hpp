@@ -25,7 +25,7 @@ public:
   }
 
   void receiveKeys() {
-    inputBuffer += readSerial();
+    inputBuffer += filterSerialInput(readSerial());
     // Backspace handling
     if ((inputBuffer.endsWith("\b") || inputBuffer.endsWith("\x7F")) && inputBuffer.length() >= 1) {
       if (inputBuffer.length() >= 2) {
@@ -52,13 +52,14 @@ public:
     if (inputBuffer.endsWith("\r") || inputBuffer.endsWith("\n")) {
       auto command = inputBuffer.substring(0, inputBuffer.length() - 1);
       inputBuffer = "";
+      console.scrollReset();
 
       if (command.startsWith("/")) {
         if (command == "/help") {
           console.print("Available commands:");
           console.print("/clear - Clear the console");
           console.print("/self - Show self information");
-          console.print("/list chan,contact - Request channel or contact list");
+          console.print("/list channel,user,repeater - Request channel, user, or repeater list");
           return;
         } else if (command == "/clear") {
           console.clear();
@@ -70,14 +71,24 @@ public:
           console.print("SF   " + String(client.self.radioSpreadingFactor));
           console.print("CR   " + String(client.self.radioCodingRate));
         } else if (command.startsWith("/list")) {
-          if (command.endsWith("chan")) {
+          if (command.endsWith("channel")) {
             for (int i = 0; i < client.channels.size(); i++) {
               auto &ch = client.channels.at(i);
               console.print("CH " + String(i) + ": " + ch.name);
             }
-          } else if (command.endsWith("contact")) {
+          } else if (command.endsWith("user")) {
             for (const auto &[_, contact] : client.contacts) {
+              if (contact.type != 1) {
+                continue;
+              }
               console.print("CON: " + contact.advName);
+            }
+          } else if (command.endsWith("repeater")) {
+            for (const auto &[_, contact] : client.contacts) {
+              if (contact.type != 2) {
+                continue;
+              }
+              console.print("REP: " + contact.advName);
             }
           }
         } else if (command.startsWith("/to ")) {
@@ -123,17 +134,53 @@ public:
   void draw(GFX &gfx) {
     prompt = "> " + inputBuffer;
 
-    gfx.drawText(16, gfx.height - 24, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
+    gfx.drawText(0, gfx.height - 24, 1, const_cast<char *>(prompt.c_str()), prompt.length(), JUSTIFY_LEFT);
 
     // Flashing cursor
     if ((millis() / 100) % 2 == 0) {
-      gfx.drawRect(16 + prompt.length() * 10, gfx.height - 24, 6, 12);
+      gfx.drawRect(prompt.length() * 10, gfx.height - 24, 6, 12);
     }
   }
 
   bool activity = false;
 
 private:
+  arduino::String filterSerialInput(const arduino::String &input) {
+    arduino::String filtered;
+
+    for (int i = 0; i < input.length(); i++) {
+      if (input[i] == '\x1b') {
+        if ((i + 2) < input.length() && input[i + 1] == '[' && input[i + 2] == 'A') {
+          console.scrollUp();
+          i += 2;
+          continue;
+        }
+
+        if ((i + 2) < input.length() && input[i + 1] == '[' && input[i + 2] == 'B') {
+          console.scrollDown();
+          i += 2;
+          continue;
+        }
+
+        if ((i + 3) < input.length() && input[i + 1] == '[' && input[i + 2] == '5' && input[i + 3] == '~') {
+          console.scrollUp();
+          i += 3;
+          continue;
+        }
+
+        if ((i + 3) < input.length() && input[i + 1] == '[' && input[i + 2] == '6' && input[i + 3] == '~') {
+          console.scrollDown();
+          i += 3;
+          continue;
+        }
+      }
+
+      filtered += input[i];
+    }
+
+    return filtered;
+  }
+
   MeshCore::Client &client;
   UI::Console &console;
   arduino::String prompt;

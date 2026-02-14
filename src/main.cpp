@@ -19,7 +19,7 @@
 void draw(void);
 
 #define PADDING             10
-#define KEY_DEBOUNCE_US     100 * 1000
+#define KEY_DEBOUNCE_US     10 * 1000
 #define MSG_POLL_US         1000 * 1000
 #define SLEEP_TIMEOUT_MS    30000
 #define ACTIVITY_TIMEOUT_MS 500
@@ -75,6 +75,7 @@ void setup() {
     if (client.activity) {
       activityTimeout = millis() + ACTIVITY_TIMEOUT_MS;
       coldBoot = false;
+      console.scrollReset();
     }
 
     if (client.activity || prompt.activity) {
@@ -114,12 +115,14 @@ void draw(void) {
       }
     }
 
-    // Render area box
-    gfx.drawRect(0, 0, gfx.width, 1);
-    gfx.drawRect(0, gfx.height, gfx.width, 1);
+    if (sz != 0) {
+      // Render area box
+      gfx.drawRect(0, 0, gfx.width, 1);
+      gfx.drawRect(0, gfx.height, gfx.width, 1);
 
-    gfx.drawRect(0, 0, 2, gfx.height);
-    gfx.drawRect(gfx.width, 0, 2, gfx.height);
+      gfx.drawRect(0, 0, 2, gfx.height);
+      gfx.drawRect(gfx.width, 0, 2, gfx.height);
+    }
   }
 
   if (coldBoot && frameCount % 4 == 0) {
